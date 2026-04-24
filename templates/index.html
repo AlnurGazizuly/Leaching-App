@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeachLab — Metal Recovery Predictor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    /* ─── Reset & tokens ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d0f12;
+      --surface:     #141720;
+      --surface2:    #1c2030;
+      --border:      rgba(255,255,255,0.07);
+      --border-hi:   rgba(255,255,255,0.15);
+      --teal:        #2dd4bf;
+      --teal-dim:    rgba(45,212,191,0.12);
+      --amber:       #f59e0b;
+      --amber-dim:   rgba(245,158,11,0.12);
+      --red:         #f87171;
+      --muted:       #6b7280;
+      --text:        #e2e8f0;
+      --text-dim:    #94a3b8;
+      --mono:        'DM Mono', monospace;
+      --sans:        'Syne', sans-serif;
+      --li:          #38bdf8;
+      --co:          #2dd4bf;
+      --mn:          #f59e0b;
+      --ni:          #f472b6;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+    /* ─── Layout ─────────────────────────────────────────────────────────── */
+    .shell { display: grid; grid-template-columns: 380px 1fr; min-height: 100vh; }
+
+    /* ─── Sidebar ────────────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 2rem 1.75rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 2rem;
+    }
+    .logo-mark {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--teal); display: flex; align-items: center; justify-content: center;
+    }
+    .logo-mark svg { width: 18px; height: 18px; }
+    .logo-name { font-family: var(--sans); font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+    .logo-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    .model-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--teal-dim); border: 1px solid rgba(45,212,191,0.25);
+      border-radius: 20px; padding: 4px 10px; margin-bottom: 1.75rem;
+      font-family: var(--mono); font-size: 11px; color: var(--teal);
+    }
+    .model-badge.offline {
+      background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.25);
+      color: var(--red);
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .section-label {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+      color: var(--muted); text-transform: uppercase;
+      margin-bottom: 0.75rem; margin-top: 1.5rem;
+    }
+    .section-label:first-of-type { margin-top: 0; }
+
+    .field { margin-bottom: 0.875rem; }
+    .field label {
+      display: block; font-family: var(--mono); font-size: 11px;
+      color: var(--text-dim); margin-bottom: 5px;
+    }
+    .field input, .field select {
+      width: 100%; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-family: var(--mono); font-size: 13px;
+      padding: 8px 10px; outline: none; transition: border-color 0.2s;
+      appearance: none;
+    }
+    .field input:focus, .field select:focus { border-color: var(--teal); }
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+      padding-right: 28px;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .run-btn {
+      width: 100%; margin-top: 1.75rem;
+      background: var(--teal); color: #0d0f12;
+      border: none; border-radius: 8px;
+      font-family: var(--sans); font-size: 14px; font-weight: 600;
+      padding: 13px; cursor: pointer; letter-spacing: 0.01em;
+      transition: opacity 0.2s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .run-btn:hover { opacity: 0.88; }
+    .run-btn:active { transform: scale(0.98); }
+    .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .run-btn .spinner {
+      width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.3);
+      border-top-color: #0d0f12; border-radius: 50%; animation: spin 0.7s linear infinite; display: none;
+    }
+    .run-btn.loading .spinner { display: block; }
+    .run-btn.loading .btn-label { opacity: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Main panel ─────────────────────────────────────────────────────── */
+    .main {
+      padding: 2rem 2.5rem;
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 1.5rem;
+    }
+
+    .main-header { border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; }
+    .main-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+    .main-header p { font-size: 13px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+
+    /* ─── Idle state ─────────────────────────────────────────────────────── */
+    .idle-state {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 1rem; color: var(--muted); text-align: center; padding: 4rem;
+    }
+    .idle-icon { font-size: 48px; opacity: 0.3; }
+    .idle-state h3 { font-size: 16px; color: var(--text-dim); }
+    .idle-state p { font-family: var(--mono); font-size: 12px; max-width: 320px; line-height: 1.7; }
+
+    /* ─── Results ────────────────────────────────────────────────────────── */
+    .results { display: none; flex-direction: column; gap: 1.5rem; }
+    .results.visible { display: flex; }
+
+    /* Metal cards */
+    .metals-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metal-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.25rem 1rem;
+      position: relative; overflow: hidden;
+      animation: fadeUp 0.4s ease both;
+    }
+    .metal-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+    .metal-card.li::before { background: var(--li); }
+    .metal-card.co::before { background: var(--co); }
+    .metal-card.mn::before { background: var(--mn); }
+    .metal-card.ni::before { background: var(--ni); }
+    .metal-card:nth-child(1) { animation-delay: 0.05s; }
+    .metal-card:nth-child(2) { animation-delay: 0.10s; }
+    .metal-card:nth-child(3) { animation-delay: 0.15s; }
+    .metal-card:nth-child(4) { animation-delay: 0.20s; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+    .metal-symbol { font-family: var(--sans); font-size: 11px; color: var(--muted); margin-bottom: 0.5rem; }
+    .metal-value { font-family: var(--mono); font-size: 28px; font-weight: 500; line-height: 1; }
+    .metal-pct { font-size: 14px; color: var(--muted); margin-left: 2px; }
+    .metal-label { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    .progress-wrap { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 12px; }
+    .progress-fill { height: 3px; border-radius: 2px; transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1); width: 0%; }
+    .li .progress-fill { background: var(--li); }
+    .co .progress-fill { background: var(--co); }
+    .mn .progress-fill { background: var(--mn); }
+    .ni .progress-fill { background: var(--ni); }
+
+    /* Charts */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .chart-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.25rem;
+      animation: fadeUp 0.4s ease 0.25s both;
+    }
+    .chart-card.full { grid-column: 1 / -1; }
+    .chart-title { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 1rem; letter-spacing: 0.06em; text-transform: uppercase; }
+
+    /* Conditions log */
+    .cond-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.25rem 1.5rem;
+      animation: fadeUp 0.4s ease 0.3s both;
+    }
+    .cond-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem 2rem; margin-top: 0.75rem; }
+    .cond-item label { font-family: var(--mono); font-size: 10px; color: var(--muted); display: block; margin-bottom: 2px; }
+    .cond-item span { font-family: var(--mono); font-size: 13px; color: var(--text); }
+
+    /* Insight */
+    .insight-card {
+      background: var(--amber-dim); border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 10px; padding: 1rem 1.25rem;
+      display: flex; gap: 12px; align-items: flex-start;
+      animation: fadeUp 0.4s ease 0.35s both;
+    }
+    .insight-icon { font-size: 16px; margin-top: 1px; }
+    .insight-text { font-family: var(--mono); font-size: 12px; color: var(--text-dim); line-height: 1.7; }
+    .insight-text strong { color: var(--amber); font-weight: 500; }
+
+    /* Error */
+    .error-banner {
+      display: none; background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.25);
+      border-radius: 8px; padding: 0.875rem 1rem;
+      font-family: var(--mono); font-size: 12px; color: var(--red);
+    }
+    .error-banner.visible { display: block; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0d0f12" stroke-width="2.5">
+          <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-name">LeachLab</div>
+        <div class="logo-sub">Metal Recovery Predictor</div>
+      </div>
+    </div>
+
+    <div class="model-badge {% if not model_loaded %}offline{% endif %}">
+      <span class="dot"></span>
+      {% if model_loaded %}Global GBM model · active{% else %}Model not found · offline{% endif %}
+    </div>
+
+    <!-- Feed composition -->
+    <div class="section-label">Metal feed composition (%)</div>
+    <div class="grid-2">
+      <div class="field"><label>Li in feed</label><input type="number" id="li_feed" value="6.79" min="0" max="100" step="0.01" /></div>
+      <div class="field"><label>Co in feed</label><input type="number" id="co_feed" value="17.68" min="0" max="100" step="0.01" /></div>
+      <div class="field"><label>Mn in feed</label><input type="number" id="mn_feed" value="16.46" min="0" max="100" step="0.01" /></div>
+      <div class="field"><label>Ni in feed</label><input type="number" id="ni_feed" value="17.58" min="0" max="100" step="0.01" /></div>
+    </div>
+
+    <!-- Leaching agent -->
+    <div class="section-label">Leaching agent</div>
+    <div class="field">
+      <label>Agent type</label>
+      <select id="leaching_agent">
+        <option>Sulfuric Acid</option>
+        <option>Hydrochloric Acid</option>
+        <option selected>Lactic Acid</option>
+        <option>Citric Acid</option>
+        <option>Nitric Acid</option>
+        <option>Oxalic Acid (H₂C₂O₄)</option>
+        <option>Dl-Malic Acid</option>
+        <option>L-Tartaric Acid</option>
+        <option>Phosphoric Acid</option>
+        <option>Succinic Acid</option>
+        <option>Ascorbic Acid</option>
+        <option>Malic Acid</option>
+        <option>Iminodiacetic Acid</option>
+        <option>Ammonium Bicarbonate</option>
+        <option>Sodium Hydroxide</option>
+        <option>Sulfurous Acid</option>
+        <option>Hydrogen Peroxide</option>
+        <option>Hydroxylammonium Chloride</option>
+      </select>
+    </div>
+    <div class="field"><label>Concentration (M)</label><input type="number" id="leach_conc" value="1.5" min="0.1" max="6" step="0.1" /></div>
+
+    <!-- Reducing agent -->
+    <div class="section-label">Reducing agent</div>
+    <div class="field">
+      <label>Agent type</label>
+      <select id="reducing_agent">
+        <option selected>Hydrogen Peroxide</option>
+        <option>Ascorbic Acid</option>
+        <option>Ammonium Sulfite</option>
+        <option value="Unknown">None / Unknown</option>
+      </select>
+    </div>
+    <div class="field"><label>Concentration (%)</label><input type="number" id="reduce_conc" value="1.5" min="0" max="25" step="0.1" /></div>
+
+    <!-- Process conditions -->
+    <div class="section-label">Process conditions</div>
+    <div class="grid-2">
+      <div class="field"><label>Temperature (°C)</label><input type="number" id="temp" value="60" min="20" max="100" step="1" /></div>
+      <div class="field"><label>Time (min)</label><input type="number" id="time_min" value="50" min="0" max="1080" step="5" /></div>
+    </div>
+
+    <button class="run-btn" id="predictBtn" onclick="runPrediction()">
+      <div class="spinner"></div>
+      <span class="btn-label">Run prediction</span>
+    </button>
+  </aside>
+
+  <!-- ── Main panel ───────────────────────────────────────────────────────── -->
+  <main class="main">
+    <div class="main-header">
+      <h1>Extraction efficiency prediction</h1>
+      <p>Global GBM model · Li · Co · Mn · Ni · one-hot encoded acid pairs</p>
+    </div>
+
+    <!-- Idle -->
+    <div class="idle-state" id="idleState">
+      <div class="idle-icon">⬡</div>
+      <h3>No prediction yet</h3>
+      <p>Set your experimental conditions in the panel on the left and press Run prediction.</p>
+    </div>
+
+    <!-- Error -->
+    <div class="error-banner" id="errorBanner"></div>
+
+    <!-- Results -->
+    <div class="results" id="results">
+
+      <!-- Metal cards -->
+      <div class="metals-row">
+        <div class="metal-card li">
+          <div class="metal-symbol">Lithium · Li</div>
+          <div class="metal-value" id="val-li">—<span class="metal-pct"></span></div>
+          <div class="metal-label">% recovery</div>
+          <div class="progress-wrap"><div class="progress-fill" id="bar-li"></div></div>
+        </div>
+        <div class="metal-card co">
+          <div class="metal-symbol">Cobalt · Co</div>
+          <div class="metal-value" id="val-co">—<span class="metal-pct"></span></div>
+          <div class="metal-label">% recovery</div>
+          <div class="progress-wrap"><div class="progress-fill" id="bar-co"></div></div>
+        </div>
+        <div class="metal-card mn">
+          <div class="metal-symbol">Manganese · Mn</div>
+          <div class="metal-value" id="val-mn">—<span class="metal-pct"></span></div>
+          <div class="metal-label">% recovery</div>
+          <div class="progress-wrap"><div class="progress-fill" id="bar-mn"></div></div>
+        </div>
+        <div class="metal-card ni">
+          <div class="metal-symbol">Nickel · Ni</div>
+          <div class="metal-value" id="val-ni">—<span class="metal-pct"></span></div>
+          <div class="metal-label">% recovery</div>
+          <div class="progress-wrap"><div class="progress-fill" id="bar-ni"></div></div>
+        </div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Predicted efficiency by metal</div>
+          <div style="position:relative;height:220px;">
+            <canvas id="barChart" role="img" aria-label="Bar chart of predicted extraction efficiency per metal">Efficiency per metal.</canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Temperature sensitivity · Li efficiency</div>
+          <div style="position:relative;height:220px;">
+            <canvas id="tempChart" role="img" aria-label="Line chart of Li efficiency across temperature range">Li efficiency vs temperature.</canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conditions log -->
+      <div class="cond-card">
+        <div class="chart-title">Experimental conditions log</div>
+        <div class="cond-grid" id="condGrid"></div>
+      </div>
+
+      <!-- Insight -->
+      <div class="insight-card" id="insightCard">
+        <div class="insight-icon">◈</div>
+        <div class="insight-text" id="insightText"></div>
+      </div>
+
+    </div><!-- /results -->
+  </main>
+</div>
+
+<script>
+  let barChartInst = null, tempChartInst = null;
+
+  function getInputs() {
+    return {
+      li_feed:         parseFloat(document.getElementById('li_feed').value)       || 0,
+      co_feed:         parseFloat(document.getElementById('co_feed').value)       || 0,
+      mn_feed:         parseFloat(document.getElementById('mn_feed').value)       || 0,
+      ni_feed:         parseFloat(document.getElementById('ni_feed').value)       || 0,
+      leaching_agent:  document.getElementById('leaching_agent').value,
+      leach_conc:      parseFloat(document.getElementById('leach_conc').value)    || 1,
+      reducing_agent:  document.getElementById('reducing_agent').value,
+      reduce_conc:     parseFloat(document.getElementById('reduce_conc').value)   || 0,
+      temp:            parseFloat(document.getElementById('temp').value)          || 60,
+      time_min:        parseFloat(document.getElementById('time_min').value)      || 60,
+    };
+  }
+
+  async function runPrediction() {
+    const btn = document.getElementById('predictBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    document.getElementById('errorBanner').classList.remove('visible');
+
+    const inputs = getInputs();
+
+    let preds;
+    try {
+      const resp = await fetch('/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inputs),
+      });
+      const json = await resp.json();
+      if (!resp.ok || json.error) throw new Error(json.error || 'Server error');
+      preds = json.predictions;
+    } catch(err) {
+      document.getElementById('errorBanner').textContent = 'Prediction error: ' + err.message;
+      document.getElementById('errorBanner').classList.add('visible');
+      btn.disabled = false; btn.classList.remove('loading');
+      return;
+    }
+
+    btn.disabled = false; btn.classList.remove('loading');
+    document.getElementById('idleState').style.display = 'none';
+    document.getElementById('results').classList.add('visible');
+
+    const metals = [
+      { id: 'li', key: 'Li', color: '#38bdf8' },
+      { id: 'co', key: 'Co', color: '#2dd4bf' },
+      { id: 'mn', key: 'Mn', color: '#f59e0b' },
+      { id: 'ni', key: 'Ni', color: '#f472b6' },
+    ];
+
+    metals.forEach(m => {
+      const v = preds[m.key];
+      if (v === null || v === undefined) {
+        document.getElementById('val-' + m.id).textContent = 'N/A';
+        return;
+      }
+      document.getElementById('val-' + m.id).innerHTML = v.toFixed(1) + '<span class="metal-pct">%</span>';
+      setTimeout(() => {
+        document.getElementById('bar-' + m.id).style.width = v.toFixed(1) + '%';
+      }, 80);
+    });
+
+    drawBarChart(preds);
+    drawTempChart(inputs);
+    renderConditions(inputs);
+    renderInsight(preds, inputs);
+  }
+
+  function drawBarChart(preds) {
+    const ctx = document.getElementById('barChart').getContext('2d');
+    if (barChartInst) barChartInst.destroy();
+    barChartInst = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Li', 'Co', 'Mn', 'Ni'],
+        datasets: [{
+          data: ['Li','Co','Mn','Ni'].map(k => preds[k] !== null ? parseFloat(preds[k].toFixed(1)) : 0),
+          backgroundColor: ['#38bdf8','#2dd4bf','#f59e0b','#f472b6'],
+          borderRadius: 5,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { min: 0, max: 100,
+            ticks: { color: '#6b7280', font: { family: "'DM Mono'", size: 11 }, callback: v => v + '%' },
+            grid: { color: 'rgba(255,255,255,0.05)' }, border: { display: false },
+          },
+          x: {
+            ticks: { color: '#94a3b8', font: { family: "'DM Mono'", size: 12 } },
+            grid: { display: false }, border: { display: false },
+          }
+        }
+      }
+    });
+  }
+
+  function simulateLiByTemp(inputs, temp) {
+    const acidStr = { 'Sulfuric Acid':1.0,'Hydrochloric Acid':0.95,'Lactic Acid':0.78,'Citric Acid':0.75,'Nitric Acid':0.92,'Oxalic Acid (H₂C₂O₄)':0.72,'Dl-Malic Acid':0.70,'L-Tartaric Acid':0.68,'Phosphoric Acid':0.65,'Succinic Acid':0.62,'Ascorbic Acid':0.60,'Malic Acid':0.60,'Iminodiacetic Acid':0.58,'Ammonium Bicarbonate':0.55,'Sodium Hydroxide':0.70,'Sulfurous Acid':0.65,'Hydrogen Peroxide':0.50,'Hydroxylammonium Chloride':0.60 };
+    const red = {'Hydrogen Peroxide':0.08,'Ascorbic Acid':0.05,'Ammonium Sulfite':0.04,'Unknown':0};
+    const a = acidStr[inputs.leaching_agent] || 0.65;
+    const r = red[inputs.reducing_agent] || 0;
+    const tf = Math.min(1, 0.6 + (temp - 20) / 200);
+    const timef = Math.min(1, 0.5 + Math.log(inputs.time_min + 1) / 10);
+    const cf = Math.min(1, inputs.leach_conc / 4);
+    return parseFloat(Math.min(99.9, Math.max(5, (a + r) * tf * timef * cf * 95)).toFixed(1));
+  }
+
+  function drawTempChart(inputs) {
+    const temps = [20, 30, 40, 50, 60, 70, 80, 90, 100];
+    const vals  = temps.map(t => simulateLiByTemp(inputs, t));
+    const cur   = inputs.temp;
+
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    if (tempChartInst) tempChartInst.destroy();
+    tempChartInst = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: temps.map(t => t + '°'),
+        datasets: [{
+          data: vals,
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,0.08)',
+          pointBackgroundColor: temps.map(t => t === cur ? '#f59e0b' : '#38bdf8'),
+          pointRadius: temps.map(t => t === cur ? 7 : 3),
+          pointBorderWidth: temps.map(t => t === cur ? 2 : 0),
+          pointBorderColor: '#f59e0b',
+          fill: true, tension: 0.35,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(1) + '%' } } },
+        scales: {
+          y: { min: 0, max: 100,
+            ticks: { color: '#6b7280', font: { family: "'DM Mono'", size: 11 }, callback: v => v + '%' },
+            grid: { color: 'rgba(255,255,255,0.05)' }, border: { display: false },
+          },
+          x: {
+            ticks: { color: '#94a3b8', font: { family: "'DM Mono'", size: 11 }, autoSkip: false },
+            grid: { display: false }, border: { display: false },
+          }
+        }
+      }
+    });
+  }
+
+  function renderConditions(inp) {
+    const items = [
+      { label: 'Leaching agent',     value: inp.leaching_agent },
+      { label: 'Leaching conc.',     value: inp.leach_conc + ' M' },
+      { label: 'Reducing agent',     value: inp.reducing_agent },
+      { label: 'Reducing conc.',     value: inp.reduce_conc + ' %' },
+      { label: 'Temperature',        value: inp.temp + ' °C' },
+      { label: 'Time',               value: inp.time_min + ' min' },
+      { label: 'Li feed',            value: inp.li_feed + ' %' },
+      { label: 'Co feed',            value: inp.co_feed + ' %' },
+      { label: 'Mn feed',            value: inp.mn_feed + ' %' },
+    ];
+    document.getElementById('condGrid').innerHTML = items.map(i =>
+      `<div class="cond-item"><label>${i.label}</label><span>${i.value}</span></div>`
+    ).join('');
+  }
+
+  function renderInsight(preds, inp) {
+    const vals = ['Li','Co','Mn','Ni'].map(k => preds[k] || 0);
+    const avg  = vals.reduce((a,b) => a+b, 0) / vals.length;
+    const low  = ['Li','Co','Mn','Ni'].filter(k => preds[k] < 70);
+
+    let msg = '';
+    if (avg >= 85) {
+      msg = `<strong>Excellent conditions.</strong> Average efficiency ${avg.toFixed(1)}% across all metals. This combination is performing at a high level.`;
+    } else if (avg >= 65) {
+      msg = `<strong>Moderate efficiency</strong> (avg ${avg.toFixed(1)}%). ` +
+            (low.length ? `Recovery of <strong>${low.join(', ')}</strong> is below 70% — consider increasing temperature toward 75–85 °C or extending reaction time.` : 'Try increasing temperature or leaching concentration to push past 85%.');
+    } else {
+      msg = `<strong>Low efficiency</strong> (avg ${avg.toFixed(1)}%). The current acid/temperature combination may not be ideal. ` +
+            `Try a stronger acid (Sulfuric or Hydrochloric), higher concentration, or longer reaction time. Current temp ${inp.temp}°C — increasing to 80°C may significantly improve yields.`;
+    }
+    document.getElementById('insightText').innerHTML = msg;
+  }
+</script>
+</body>
+</html>
