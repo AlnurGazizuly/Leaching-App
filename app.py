@@ -1,13 +1,5 @@
 """
-Leaching Efficiency Predictor — Flask Backend
-=============================================
-Loads the trained global model (.pkl) and serves predictions via a REST API.
-The frontend (templates/index.html) calls /predict with experimental conditions
-and receives per-metal extraction efficiency values.
-
-Usage:
-    python app.py
-Then open http://127.0.0.1:5000 in your browser.
+ http://127.0.0.1:5000
 """
 
 import os
