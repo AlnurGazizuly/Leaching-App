@@ -1,5 +1,5 @@
 """
- http://127.0.0.1:5000
+Then open http://127.0.0.1:5000
 """
 
 import os
@@ -11,7 +11,6 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
-
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "finaltrial.pkl")
 
@@ -41,8 +40,6 @@ def load_model():
 
 
 MODEL_LOADED = load_model()
-
-
 
 def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
     eps = 1e-6
@@ -75,7 +72,6 @@ def prepare_input(data: dict) -> pd.DataFrame:
 
 
 def predict_all(input_df: pd.DataFrame) -> dict:
-    """Run the global model and return per-metal predictions."""
     feature_cols = all_numeric + categorical
     X = input_df[feature_cols]
     X_proc = preprocessor.transform(X)
@@ -114,9 +110,81 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 
+
+@app.route("/sweep", methods=["POST"])
+def sweep():
+    if not MODEL_LOADED:
+        return jsonify({"error": "Model not loaded."}), 503
+
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "No JSON body received."}), 400
+
+    try:
+        base = {
+            "li_feed":        float(data.get("li_feed",  0)),
+            "co_feed":        float(data.get("co_feed",  0)),
+            "mn_feed":        float(data.get("mn_feed",  0)),
+            "ni_feed":        float(data.get("ni_feed",  0)),
+            "leaching_agent": str(data.get("leaching_agent", "")).strip().title(),
+            "leach_conc":     float(data.get("leach_conc", 1)),
+            "reducing_agent": str(data.get("reducing_agent", "Unknown")).strip().title(),
+            "reduce_conc":    float(data.get("reduce_conc", 0)),
+            "temp":           float(data.get("temp", 60)),
+            "time_min":       float(data.get("time_min", 60)),
+        }
+
+        def run_sweep(param, values):
+            out = []
+            for v in values:
+                inputs = dict(base)
+                inputs[param] = v
+                df = prepare_input(inputs)
+                out.append(predict_all(df))
+            return out
+
+        import numpy as np
+
+        temp_vals    = [round(v, 1) for v in np.arange(20, 101, 10).tolist()]
+        lconc_vals   = [round(v, 2) for v in np.arange(0.5, 5.1, 0.5).tolist()]
+        time_vals    = [round(v, 0) for v in np.arange(10, 181, 20).tolist()]
+        rconc_vals   = [round(v, 1) for v in np.arange(0, 10.1, 1.0).tolist()]
+
+        sweeps = {
+            "temperature": {
+                "label": "Temperature (°C)", "unit": "°C",
+                "values": temp_vals, "current": base["temp"],
+                "results": run_sweep("temp", temp_vals),
+            },
+            "leach_conc": {
+                "label": "Leaching concentration (M)", "unit": "M",
+                "values": lconc_vals, "current": base["leach_conc"],
+                "results": run_sweep("leach_conc", lconc_vals),
+            },
+            "time": {
+                "label": "Reaction time (min)", "unit": "min",
+                "values": time_vals, "current": base["time_min"],
+                "results": run_sweep("time_min", time_vals),
+            },
+            "reduce_conc": {
+                "label": "Reducing agent concentration (%)", "unit": "%",
+                "values": rconc_vals, "current": base["reduce_conc"],
+                "results": run_sweep("reduce_conc", rconc_vals),
+            },
+        }
+
+        return jsonify({"sweeps": sweeps, "status": "ok"})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/health")
 def health():
     return jsonify({"model_loaded": MODEL_LOADED, "status": "running"})
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
