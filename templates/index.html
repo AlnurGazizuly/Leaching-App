@@ -215,9 +215,157 @@
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+
+    /* ── Welcome / Disclaimer Dialog ── */
+    .dialog-backdrop {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem;
+      animation: backdropIn 0.25s ease;
+    }
+    @keyframes backdropIn { from { opacity:0; } to { opacity:1; } }
+    .dialog-backdrop.hiding {
+      animation: backdropOut 0.2s ease forwards;
+    }
+    @keyframes backdropOut { to { opacity:0; } }
+
+    .dialog-box {
+      background: var(--surface);
+      border: 1px solid var(--border-hi);
+      border-radius: 14px;
+      max-width: 520px; width: 100%;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      animation: dialogIn 0.28s cubic-bezier(0.34,1.4,0.64,1);
+      overflow: hidden;
+    }
+    @keyframes dialogIn { from { opacity:0; transform:translateY(18px) scale(0.97); } to { opacity:1; transform:none; } }
+
+    .dialog-header {
+      padding: 1.5rem 1.75rem 0;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .dialog-logo-mark {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: var(--teal); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .dialog-logo-mark svg { width: 20px; height: 20px; }
+    .dialog-title-block { flex: 1; }
+    .dialog-title {
+      font-size: 16px; font-weight: 700; letter-spacing: -0.02em;
+      color: var(--text); line-height: 1.2;
+    }
+    .dialog-subtitle {
+      font-family: var(--mono); font-size: 11px; color: var(--teal);
+      margin-top: 3px;
+    }
+
+    .dialog-body { padding: 1.25rem 1.75rem; }
+
+    .dialog-desc {
+      font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+      line-height: 1.75; margin-bottom: 1.1rem;
+    }
+    .dialog-desc strong { color: var(--text); font-weight: 500; }
+
+    .dialog-notice {
+      background: var(--amber-dim);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 8px; padding: 0.85rem 1rem;
+      display: flex; gap: 10px; align-items: flex-start;
+      margin-bottom: 1.25rem;
+    }
+    .dialog-notice-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .dialog-notice-text {
+      font-family: var(--mono); font-size: 11px;
+      color: var(--amber); line-height: 1.65;
+    }
+    .dialog-notice-text strong { font-weight: 600; }
+
+    .dialog-divider {
+      height: 1px; background: var(--border); margin: 0 -1.75rem 1.1rem;
+    }
+
+    .dialog-authors {
+      font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+      line-height: 1.7;
+    }
+    .dialog-authors strong { color: var(--text-dim); font-weight: 500; }
+
+    .dialog-footer {
+      padding: 1rem 1.75rem 1.5rem;
+      display: flex; justify-content: flex-end;
+    }
+    .dialog-ok-btn {
+      background: var(--teal); color: #0d0f12;
+      border: none; border-radius: 8px;
+      font-family: var(--sans); font-size: 13px; font-weight: 600;
+      padding: 9px 28px; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .dialog-ok-btn:hover { opacity: 0.88; }
+    .dialog-ok-btn:active { transform: scale(0.97); }
   </style>
 </head>
 <body>
+
+<!-- ── Welcome & Disclaimer Dialog ── -->
+<div class="dialog-backdrop" id="welcomeBackdrop">
+  <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+
+    <div class="dialog-header">
+      <div class="dialog-logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0d0f12" stroke-width="2.5">
+          <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+        </svg>
+      </div>
+      <div class="dialog-title-block">
+        <div class="dialog-title" id="dialogTitle">LeachLab — Metal Recovery Predictor</div>
+        <div class="dialog-subtitle">Bucknell University · Department of Chemical Engineering</div>
+      </div>
+    </div>
+
+    <div class="dialog-body">
+      <p class="dialog-desc">
+        <strong>LeachLab</strong> is a machine-learning–powered tool developed to predict the
+        hydrometallurgical recovery efficiency of critical battery metals (Lithium (Li), Cobalt (Co), Manganese (Mn), and Nickel (Ni)) from
+        spent lithium-ion cathode materials under a range of leaching conditions. Given your
+        process inputs, the model estimates per-metal extraction yields and sweeps key
+        parameters to help guide experimental design.
+      </p>
+
+      <div class="dialog-notice">
+        <div class="dialog-notice-icon">⚠</div>
+        <div class="dialog-notice-text">
+          <strong>Experimental use only.</strong> This tool is a research prototype trained on
+          published literature data. Predictions are model estimates and do not substitute for
+          laboratory validation. Results may deviate from real-world outcomes depending on
+          material purity, reactor geometry, and other uncontrolled factors. Use findings as
+          a <strong>starting point for experimentation</strong>, not as definitive process guidance.
+        </div>
+      </div>
+
+      <div class="dialog-divider"></div>
+
+      <div class="dialog-authors">
+        <strong>Developed by</strong><br>
+        Bucknell University — Department of Chemical Engineering<br><br>
+        <strong>Authors &amp; Contributors</strong><br>
+        Jude Okolie, Alnur Gazizuly, My Ly · Bucknell ChE<br><br>
+        <strong>Copyright © 2025 Bucknell University Chemical Engineering.</strong><br>
+        All rights reserved. For academic and research use only.
+      </div>
+    </div>
+
+    <div class="dialog-footer">
+      <button class="dialog-ok-btn" onclick="dismissDialog()">I understand — continue</button>
+    </div>
+
+  </div>
+</div>
+
 <div class="shell">
 
   <aside class="sidebar">
@@ -557,6 +705,16 @@ function renderSweeps(sweeps) {
     });
   });
 }
+
+/* ── Welcome Dialog ── */
+function dismissDialog() {
+  const backdrop = document.getElementById('welcomeBackdrop');
+  backdrop.classList.add('hiding');
+  backdrop.addEventListener('animationend', () => backdrop.remove(), { once: true });
+}
+document.getElementById('welcomeBackdrop').addEventListener('click', function(e) {
+  if (e.target === this) dismissDialog();
+});
 
 /* Verdict */
 function avgOf(results) {
