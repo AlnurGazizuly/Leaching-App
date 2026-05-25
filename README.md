@@ -300,5 +300,5 @@ All training scripts additionally require `matplotlib` and `shap`, which are ava
 If you use this code or dataset in your research, please cite:
 
 ```
-[Citation to be added upon publication]
+[Jude Okolie, Alnur Gazizuly, My Ly · Bucknell ChE. Bucknell University Chemical Engineering Department]
 ```
